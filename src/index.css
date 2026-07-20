@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* Custom hotspot styles */
+.hotspot-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.hotspot-btn:hover {
+  transform: scale(1.2);
+  background-color: rgba(59, 130, 246, 1);
+}
+
+.hotspot-btn.active {
+  background-color: rgba(34, 197, 94, 0.95);
+  border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
+  transform: scale(1.25);
+}
+
+.hotspot-btn.active .hotspot-label {
+  opacity: 1;
+  pointer-events: auto;
+  min-width: 140px;
+  text-align: left;
+}
+
+.hotspot-label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  color: #1f2937;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.hotspot-btn:hover .hotspot-label {
+  opacity: 1;
+}
+
+.hotspot-label p {
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* Model viewer element defaults */
+model-viewer {
+  --poster-color: transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Range input styling */
+input[type="range"] {
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
