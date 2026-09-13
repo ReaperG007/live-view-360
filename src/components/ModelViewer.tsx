@@ -4,7 +4,7 @@ import ModelViewerElement from './ModelViewerElement';
 import SceneGround from './SceneGround';
 import FpvController from './FpvController';
 import WalkthroughPlayer from './WalkthroughPlayer';
-import WalkScrubController from './WalkScrubController';
+import WalkJoystick from './WalkJoystick';
 import { focusCameraOnHotspot } from './panels/HotspotPanel';
 import type { ModelViewerInstance } from '../model-viewer';
 
@@ -149,9 +149,10 @@ export default function ModelViewer() {
       v.cameraTarget = '0 1 0';
       v.fieldOfView = '90deg';
 
-      // Disable pan and zoom in FPV — only rotation allowed
+      // Disable all built-in controls in FPV — joystick is the sole controller
       viewer.setAttribute('disable-pan', '');
       viewer.setAttribute('disable-zoom', '');
+      viewer.setAttribute('disable-orbit', '');
     } else {
       // Restore orbit mode settings
       const v = viewer as any;
@@ -159,6 +160,7 @@ export default function ModelViewer() {
       v.cameraTarget = fpvTargetRef.current || state.cameraTarget;
       v.fieldOfView = fpvFovRef.current || state.fieldOfView;
       viewer.removeAttribute('disable-pan');
+      viewer.removeAttribute('disable-orbit');
       // Respect the user's zoom preference
       if (!state.disableZoom) viewer.removeAttribute('disable-zoom');
     }
@@ -336,9 +338,9 @@ export default function ModelViewer() {
       {/* Walkthrough playback */}
       <WalkthroughPlayer />
 
-      {/* Walk scrub joystick overlay — shown when camera path exists */}
+      {/* Walk joystick overlay — shown when camera path exists */}
       {state.modelSrc && state.cameraPath.length >= 2 && !state.walkthroughPlaying && (
-        <WalkScrubController />
+        <WalkJoystick />
       )}
 
       {/* Reset View floating button — appears when a model is active */}

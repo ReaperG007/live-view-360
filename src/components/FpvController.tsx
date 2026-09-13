@@ -63,7 +63,7 @@ export default function FpvController() {
       radiusRef.current = o.radius;
       targetRef.current = parseTarget(v.getCameraTarget?.().toString() ?? state.cameraTarget);
     } catch { /* ignore */ }
-  }, [state.cameraMode, state.cameraTarget]);
+  }, [state.cameraMode]); // only re-seed when entering FPV mode, not during operation
 
   useEffect(() => {
     if (state.cameraMode !== 'fpv') return;
