@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import * as THREE from 'three';
 import { useEditor } from '../store/editor-store';
 import ModelViewerElement from './ModelViewerElement';
 import SceneGround from './SceneGround';
@@ -115,6 +116,76 @@ export default function ModelViewer() {
       // viewer not ready
     }
   }, [state.modelScale]);
+
+  // ── Skybox scale ─────────────────────────────────────────────
+  // Manipulate the Three.js scene to scale the skybox sphere.
+  // When skyboxScale != 1, replace scene.background with a scaled
+  // sphere mesh carrying the skybox texture.
+  const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
+  const skyboxTextureRef = useRef<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    const viewer = viewerRef.current as any;
+    if (!viewer || !state.modelLoaded) return;
+
+    const scene: THREE.Scene | undefined = viewer.scene;
+    if (!scene) return;
+
+    // Clean up previous skybox mesh
+    if (skyboxMeshRef.current) {
+      scene.remove(skyboxMeshRef.current);
+      skyboxMeshRef.current.geometry.dispose();
+      (skyboxMeshRef.current.material as THREE.Material).dispose();
+      skyboxMeshRef.current = null;
+    }
+
+    if (state.skyboxScale === 1 || !state.skyboxImage) {
+      // Restore the texture as scene.background if we had replaced it
+      if (skyboxTextureRef.current && state.skyboxImage) {
+        scene.background = skyboxTextureRef.current;
+        skyboxTextureRef.current = null;
+      }
+      return;
+    }
+
+    // Get the current background texture
+    const bg = scene.background;
+    if (!bg || !(bg instanceof THREE.Texture)) return;
+
+    // Store the original texture so we can restore it
+    skyboxTextureRef.current = bg;
+
+    // Create a large sphere with the skybox texture on the inside
+    const radius = 100 * state.skyboxScale;
+    const geometry = new THREE.SphereGeometry(radius, 64, 32);
+    const material = new THREE.MeshBasicMaterial({
+      map: bg,
+      side: THREE.BackSide,
+      fog: false,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    skyboxMeshRef.current = mesh;
+
+    // Remove the texture from scene.background so Three.js doesn't
+    // render it as a fullscreen backdrop (our mesh handles it now)
+    scene.background = null;
+
+    return () => {
+      // Cleanup on unmount or dependency change
+      if (skyboxMeshRef.current) {
+        scene.remove(skyboxMeshRef.current);
+        skyboxMeshRef.current.geometry.dispose();
+        (skyboxMeshRef.current.material as THREE.Material).dispose();
+        skyboxMeshRef.current = null;
+      }
+      // Restore original background if the component unmounts
+      if (skyboxTextureRef.current) {
+        scene.background = skyboxTextureRef.current;
+        skyboxTextureRef.current = null;
+      }
+    };
+  }, [state.skyboxScale, state.skyboxImage, state.modelLoaded]);
 
   // ── FPV camera mode ──────────────────────────────────────────
   // When FPV mode is active, lock the camera at human eye level

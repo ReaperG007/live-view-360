@@ -266,6 +266,39 @@ export default function ScenePanel() {
         </div>
       </div>
 
+      {/* Skybox Size */}
+      <div className="border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">Skybox Size</h3>
+        <p className="text-xs text-gray-500 mb-2">Scale the skybox to fit your model world. Smaller values bring the sky closer; larger values push it further away.</p>
+        <div className="space-y-3">
+          <div>
+            <label className="flex justify-between text-xs text-gray-600 mb-1">
+              <span>Scale</span>
+              <span className="font-mono">{state.skyboxScale.toFixed(1)}×</span>
+            </label>
+            <input
+              type="range"
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={state.skyboxScale}
+              onChange={(e) => dispatch({ type: 'SET_SKYBOX_SCALE', payload: parseFloat(e.target.value) })}
+              className="w-full accent-blue-600"
+            />
+            <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+              <span>0.1× (close)</span>
+              <button
+                onClick={() => dispatch({ type: 'SET_SKYBOX_SCALE', payload: 1 })}
+                className="text-blue-500 hover:text-blue-700"
+              >
+                Reset
+              </button>
+              <span>5.0× (far)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Lighting adjustments */}
       <div className="border-t border-gray-200 pt-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">Lighting Adjustments</h3>

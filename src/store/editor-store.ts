@@ -24,6 +24,7 @@ export interface EditorState {
   // Scene / Environment
   environmentImage: string;
   skyboxImage: string;
+  skyboxScale: number; // multiplier for skybox size (0.1 - 5.0)
   exposure: number;
   shadowIntensity: number;
   shadowSoftness: number;
@@ -134,6 +135,7 @@ type Action =
   | { type: 'SET_DISABLE_ZOOM'; payload: boolean }
   | { type: 'SET_ENVIRONMENT_IMAGE'; payload: string }
   | { type: 'SET_SKYBOX_IMAGE'; payload: string }
+  | { type: 'SET_SKYBOX_SCALE'; payload: number }
   | { type: 'SET_EXPOSURE'; payload: number }
   | { type: 'SET_SHADOW_INTENSITY'; payload: number }
   | { type: 'SET_SHADOW_SOFTNESS'; payload: number }
@@ -189,6 +191,7 @@ export const initialState: EditorState = {
   disableZoom: false,
   environmentImage: '',
   skyboxImage: '',
+  skyboxScale: 1,
   exposure: 1,
   shadowIntensity: 1,
   shadowSoftness: 1,
@@ -252,6 +255,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return { ...state, environmentImage: action.payload };
     case 'SET_SKYBOX_IMAGE':
       return { ...state, skyboxImage: action.payload };
+    case 'SET_SKYBOX_SCALE':
+      return { ...state, skyboxScale: action.payload };
     case 'SET_EXPOSURE':
       return { ...state, exposure: action.payload };
     case 'SET_SHADOW_INTENSITY':
