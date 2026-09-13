@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ModelViewerInstance, Material } from '../model-viewer';
+import { getDemoBuildingUrl } from '../utils/demo-building';
 
 
 export interface EditorState {
@@ -11,6 +12,7 @@ export interface EditorState {
   modelScale: number;
 
   // Camera
+  cameraMode: 'orbit' | 'fpv';
   cameraOrbit: string;
   cameraTarget: string;
   fieldOfView: string;
@@ -53,14 +55,21 @@ export interface EditorState {
   hotspots: Hotspot[];
   activeHotspotId: string;
 
+  // Camera path / walkthrough
+  cameraPath: CameraWaypoint[];
+  activeWaypointId: string;
+  walkthroughPlaying: boolean;
+  walkthroughLoop: boolean;
+  walkthroughSpeed: number;
+  collisionPadding: number;
+  walkthroughProgress: number; // 0..1 seek position for scrub/joystick control
+
   // UI
   activeTab: EditorTab;
   showExportPanel: boolean;
   viewLayout: ViewLayout;
   showWireframe: boolean;
-
-  // Static skybox background behind the model
-  skyboxType: 'none' | 'day' | 'night' | 'sunset';
+  showFpvControls: boolean;
 
   // Hotspot creation by clicking the model
   pickingHotspot: boolean;
@@ -90,15 +99,32 @@ export interface Hotspot {
   focusTarget: string;
   /** Field of view on click. Empty = keep current. */
   focusFov: string;
+  /** Visual style */
+  icon: HotspotIcon;
+  color: string;
+  pulse: boolean;
 }
 
-export type EditorTab = 'import' | 'scene' | 'camera' | 'animation' | 'materials' | 'hotspots' | 'inspector';
+export type HotspotIcon = 'pin' | 'dot' | 'info' | 'eye' | 'star' | 'arrow';
+
+export interface CameraWaypoint {
+  id: string;
+  label: string;
+  orbit: string;
+  target: string;
+  fov: string;
+  /** seconds to reach this point from previous */
+  duration: number;
+}
+
+export type EditorTab = 'import' | 'scene' | 'camera' | 'animation' | 'materials' | 'hotspots' | 'walkthrough' | 'inspector';
 
 type Action =
   | { type: 'SET_MODEL_SRC'; payload: string }
   | { type: 'SET_MODEL_ALT'; payload: string }
   | { type: 'SET_MODEL_LOADED'; payload: boolean }
   | { type: 'SET_MODEL_SCALE'; payload: number }
+  | { type: 'SET_CAMERA_MODE'; payload: 'orbit' | 'fpv' }
   | { type: 'SET_CAMERA_ORBIT'; payload: string }
   | { type: 'SET_CAMERA_TARGET'; payload: string }
   | { type: 'SET_FIELD_OF_VIEW'; payload: string }
@@ -129,22 +155,34 @@ type Action =
   | { type: 'SET_ACTIVE_HOTSPOT'; payload: string }
   | { type: 'REMOVE_HOTSPOT'; payload: string }
   | { type: 'UPDATE_HOTSPOT'; payload: { id: string; updates: Partial<Hotspot> } }
+  | { type: 'ADD_WAYPOINT'; payload: CameraWaypoint }
+  | { type: 'UPDATE_WAYPOINT'; payload: { id: string; updates: Partial<CameraWaypoint> } }
+  | { type: 'REMOVE_WAYPOINT'; payload: string }
+  | { type: 'REORDER_WAYPOINT'; payload: { from: number; to: number } }
+  | { type: 'SET_ACTIVE_WAYPOINT'; payload: string }
+  | { type: 'SET_WALKTHROUGH_PLAYING'; payload: boolean }
+  | { type: 'SET_WALKTHROUGH_LOOP'; payload: boolean }
+  | { type: 'SET_WALKTHROUGH_SPEED'; payload: number }
+  | { type: 'SET_COLLISION_PADDING'; payload: number }
+  | { type: 'SET_WALKTHROUGH_PROGRESS'; payload: number }
   | { type: 'SET_ACTIVE_TAB'; payload: EditorTab }
   | { type: 'SET_SHOW_EXPORT_PANEL'; payload: boolean }
   | { type: 'SET_VIEW_LAYOUT'; payload: ViewLayout }
   | { type: 'SET_SHOW_WIREFRAME'; payload: boolean }
-  | { type: 'SET_SKYBOX_TYPE'; payload: 'none' | 'day' | 'night' | 'sunset' }
+  | { type: 'SET_SHOW_FPV_CONTROLS'; payload: boolean }
   | { type: 'SET_PICKING_HOTSPOT'; payload: boolean }
   | { type: 'LOAD_CONFIG'; payload: Partial<EditorState> };
 
 export const initialState: EditorState = {
-  modelSrc: '',
-  modelAlt: 'A 3D model',
+  modelSrc: getDemoBuildingUrl(),
+  modelAlt: 'Demo Building',
   modelLoaded: false,
   modelScale: 1,
-  cameraOrbit: '0deg 75deg auto',
-  cameraTarget: 'auto auto auto',
-  fieldOfView: '45deg',
+  cameraMode: 'orbit',
+  // Default: human-eye-level perspective (eye height ~1.7m, looking slightly up at the building)
+  cameraOrbit: '0deg 85deg auto',
+  cameraTarget: '0 1 0',
+  fieldOfView: '60deg',
   autoRotate: true,
   autoRotateDelay: 0,
   cameraControls: true,
@@ -169,11 +207,18 @@ export const initialState: EditorState = {
   materials: [],
   hotspots: [],
   activeHotspotId: '',
+  cameraPath: [],
+  activeWaypointId: '',
+  walkthroughPlaying: false,
+  walkthroughLoop: false,
+  walkthroughSpeed: 1,
+  collisionPadding: 0.4,
+  walkthroughProgress: 0,
   activeTab: 'import',
   showExportPanel: false,
   viewLayout: 'single',
   showWireframe: false,
-  skyboxType: 'none',
+  showFpvControls: true,
   pickingHotspot: false,
 };
 
@@ -187,6 +232,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return { ...state, modelLoaded: action.payload };
     case 'SET_MODEL_SCALE':
       return { ...state, modelScale: action.payload };
+    case 'SET_CAMERA_MODE':
+      return { ...state, cameraMode: action.payload };
     case 'SET_CAMERA_ORBIT':
       return { ...state, cameraOrbit: action.payload };
     case 'SET_CAMERA_TARGET':
@@ -260,6 +307,39 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           h.id === action.payload.id ? { ...h, ...action.payload.updates } : h
         ),
       };
+    case 'ADD_WAYPOINT':
+      return { ...state, cameraPath: [...state.cameraPath, action.payload] };
+    case 'UPDATE_WAYPOINT':
+      return {
+        ...state,
+        cameraPath: state.cameraPath.map((w) =>
+          w.id === action.payload.id ? { ...w, ...action.payload.updates } : w
+        ),
+      };
+    case 'REMOVE_WAYPOINT':
+      return {
+        ...state,
+        cameraPath: state.cameraPath.filter((w) => w.id !== action.payload),
+        activeWaypointId: state.activeWaypointId === action.payload ? '' : state.activeWaypointId,
+      };
+    case 'REORDER_WAYPOINT': {
+      const arr = [...state.cameraPath];
+      const [moved] = arr.splice(action.payload.from, 1);
+      if (moved) arr.splice(action.payload.to, 0, moved);
+      return { ...state, cameraPath: arr };
+    }
+    case 'SET_ACTIVE_WAYPOINT':
+      return { ...state, activeWaypointId: action.payload };
+    case 'SET_WALKTHROUGH_PLAYING':
+      return { ...state, walkthroughPlaying: action.payload };
+    case 'SET_WALKTHROUGH_LOOP':
+      return { ...state, walkthroughLoop: action.payload };
+    case 'SET_WALKTHROUGH_SPEED':
+      return { ...state, walkthroughSpeed: action.payload };
+    case 'SET_COLLISION_PADDING':
+      return { ...state, collisionPadding: action.payload };
+    case 'SET_WALKTHROUGH_PROGRESS':
+      return { ...state, walkthroughProgress: Math.max(0, Math.min(1, action.payload)) };
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.payload };
     case 'SET_SHOW_EXPORT_PANEL':
@@ -268,8 +348,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return { ...state, viewLayout: action.payload };
     case 'SET_SHOW_WIREFRAME':
       return { ...state, showWireframe: action.payload };
-    case 'SET_SKYBOX_TYPE':
-      return { ...state, skyboxType: action.payload };
+    case 'SET_SHOW_FPV_CONTROLS':
+      return { ...state, showFpvControls: action.payload };
     case 'SET_PICKING_HOTSPOT':
       return { ...state, pickingHotspot: action.payload };
     case 'LOAD_CONFIG':

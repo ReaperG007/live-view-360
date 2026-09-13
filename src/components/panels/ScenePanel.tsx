@@ -1,66 +1,89 @@
 import { useRef, useState } from 'react';
 import { useEditor } from '../../store/editor-store';
 
-// Landscape-style environment lighting presets (outdoor only)
-export const SUMMER_ENV_URL =
-  'https://modelviewer.dev/shared-assets/environments/spruit_sunrise_1k_HDR.hdr';
-export const RAIN_ENV_URL =
-  'https://modelviewer.dev/shared-assets/environments/whipple_creek_regional_park_04_1k.hdr';
-export const WINTER_ENV_URL =
-  'https://modelviewer.dev/shared-assets/environments/pillars_1k.hdr';
+// ── Realistic environment + skybox image presets ──────────────
+// Environment images: HDR files for physically-based image lighting (IBL)
+// Skybox images: equirectangular panoramas for the visible background
+//
+// HDR sources from modelviewer.dev shared assets (CC0)
+// Skybox panoramas from Poly Haven (CC0)
 
-export const DEFAULT_ENVIRONMENTS: Array<{
+const ENV_NONE = '';
+const ENV_NEUTRAL = 'neutral';
+const ENV_SPRUIT =
+  'https://modelviewer.dev/shared-assets/environments/spruit_sunrise_1k_HDR.hdr';
+const ENV_WHIPPLE =
+  'https://modelviewer.dev/shared-assets/environments/whipple_creek_regional_park_04_1k.hdr';
+const ENV_PILLARS =
+  'https://modelviewer.dev/shared-assets/environments/pillars_1k.hdr';
+const ENV_PIAZZA =
+  'https://modelviewer.dev/shared-assets/environments/piazza.hdr';
+const ENV_SUNSET =
+  'https://modelviewer.dev/shared-assets/environments/kiara_1_dawn_1k.hdr';
+
+const SKY_STUDIO =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr';
+const SKY_SUNRISE =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/spruit_sunrise_1k.hdr';
+const SKY_PARK =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/whipple_creek_regional_park_04_1k.hdr';
+const SKY_FIELD =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_puresky_1k.hdr';
+const SKY_DUSK =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kiara_1_dawn_1k.hdr';
+const SKY_NIGHT =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/dikhololo_night_1k.hdr';
+const SKY_WINTER =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/pillars_1k.hdr';
+
+export interface EnvPreset {
+  id: string;
   name: string;
-  value: string;
-  landscape: string;
-  subtitle?: string;
-}> = [
-  { name: 'None', value: '', landscape: 'none' },
-  { name: 'Neutral', value: 'neutral', landscape: 'neutral' },
-  { name: 'Summer', value: SUMMER_ENV_URL, landscape: 'summer', subtitle: 'Sunny Day' },
-  { name: 'Rain', value: RAIN_ENV_URL, landscape: 'rain', subtitle: 'Overcast Park' },
-  { name: 'Winter', value: WINTER_ENV_URL, landscape: 'winter', subtitle: 'Snow Field' },
+  subtitle: string;
+  env: string;   // environment-image for IBL lighting
+  sky: string;   // skybox-image for visible background
+  exposure: number;
+  bg: string;    // fallback background color
+}
+
+export const ENVIRONMENT_PRESETS: EnvPreset[] = [
+  { id: 'none', name: 'None', subtitle: 'No environment', env: ENV_NONE, sky: '', exposure: 1, bg: '#ffffff' },
+  { id: 'neutral', name: 'Studio', subtitle: 'Neutral lighting', env: ENV_NEUTRAL, sky: SKY_STUDIO, exposure: 1, bg: '#e8e8e8' },
+  { id: 'sunrise', name: 'Sunrise', subtitle: 'Golden hour field', env: ENV_SPRUIT, sky: SKY_SUNRISE, exposure: 1.05, bg: '#f5e6d0' },
+  { id: 'park', name: 'Park', subtitle: 'Overcast woodland', env: ENV_WHIPPLE, sky: SKY_PARK, exposure: 0.95, bg: '#9aa88c' },
+  { id: 'clear', name: 'Clear Sky', subtitle: 'Bright blue sky', env: ENV_PIAZZA, sky: SKY_FIELD, exposure: 1.0, bg: '#87CEEB' },
+  { id: 'dusk', name: 'Dusk', subtitle: 'Twilight horizon', env: ENV_SUNSET, sky: SKY_DUSK, exposure: 1.1, bg: '#c4956e' },
+  { id: 'night', name: 'Night', subtitle: 'Dark starry sky', env: ENV_PILLARS, sky: SKY_NIGHT, exposure: 0.7, bg: '#1a1e2e' },
+  { id: 'winter', name: 'Winter', subtitle: 'Snowy landscape', env: ENV_PILLARS, sky: SKY_WINTER, exposure: 1.15, bg: '#d8e4ee' },
 ];
 
+export const SUMMER_ENV_URL = ENV_SPRUIT;
+export const RAIN_ENV_URL = ENV_WHIPPLE;
+export const WINTER_ENV_URL = ENV_PILLARS;
+
 /** Landscape preview thumbnails for environment cards */
-function EnvCardPreview({ kind }: { kind: string }) {
-  const base = 'absolute inset-0 overflow-hidden rounded-t-lg';
+function EnvCardPreview({ preset }: { preset: EnvPreset }) {
+  // Show the skybox panorama as a thumbnail preview
+  if (preset.id === 'none') {
+    return (
+      <div className="relative w-full aspect-[16/9] bg-gray-100 rounded-t-lg overflow-hidden flex items-center justify-center">
+        <svg className="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+      </div>
+    );
+  }
   return (
-    <div className="relative w-full aspect-[16/9] bg-gray-100 rounded-t-lg overflow-hidden">
-      {kind === 'none' && (
-        <div className={`${base} flex items-center justify-center bg-gray-200`}>
-          <svg className="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </div>
-      )}
-      {kind === 'neutral' && (
-        <div className={base} style={{ background: 'linear-gradient(180deg, #d9dee3 0%, #e9edf1 55%, #b8bfc6 55%, #9aa2aa 100%)' }}>
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white/70 blur-[1px]" />
-        </div>
-      )}
-      {kind === 'summer' && (
-        <div className={base} style={{ background: 'linear-gradient(180deg, #2f7dd6 0%, #7db5e8 48%, #cfe9c9 48%, #5e9c46 62%, #3e6e30 100%)' }}>
-          <div className="absolute top-1.5 left-2 w-4 h-4 rounded-full" style={{ background: '#fff7c2', boxShadow: '0 0 14px 4px rgba(255,230,120,.9)' }} />
-          <div className="absolute bottom-[38%] left-[62%] w-8 h-2.5 rounded-full bg-white/75 blur-[1.5px]" />
-          <div className="absolute bottom-[44%] left-[26%] w-10 h-3 rounded-full bg-white/60 blur-[1.5px]" />
-        </div>
-      )}
-      {kind === 'rain' && (
-        <div className={base} style={{ background: 'linear-gradient(180deg, #4c555e 0%, #7a848d 45%, #96a08c 45%, #4c5a43 60%, #2f3a2b 100%)' }}>
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="absolute bg-blue-200/70 rounded-sm" style={{ width: 1.5, height: 8, top: `${12 + (i % 3) * 9}%`, left: `${8 + i * 13}%`, transform: 'rotate(12deg)' }} />
-          ))}
-          <div className="absolute top-[8%] left-0 right-0 h-3 bg-gray-300/40 blur-[2px]" />
-        </div>
-      )}
-      {kind === 'winter' && (
-        <div className={base} style={{ background: 'linear-gradient(180deg, #86a6c4 0%, #c8d9e8 42%, #f2f7fb 48%, #e4ecf2 60%, #bccad6 100%)' }}>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[35%] w-16 h-px bg-white/70" />
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="absolute w-1 h-1 rounded-full bg-white" style={{ top: `${15 + ((i * 7) % 30)}%`, left: `${5 + i * 9}%`, opacity: 0.55 + (i % 4) * 0.1 }} />
-          ))}
-          <div className="absolute bottom-[30%] left-[30%] w-2.5 h-2.5 rounded-full" style={{ background: '#fffdf4', boxShadow: '0 0 8px 3px rgba(255,250,230,.8)' }} />
-        </div>
-      )}
+    <div className="relative w-full aspect-[16/9] rounded-t-lg overflow-hidden bg-gray-200">
+      <img
+        src={preset.sky}
+        alt={preset.name}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={(e) => {
+          // Fallback: show the background color if image fails to load
+          (e.target as HTMLImageElement).style.display = 'none';
+          (e.target as HTMLImageElement).parentElement!.style.background = preset.bg;
+        }}
+      />
     </div>
   );
 }
@@ -73,7 +96,7 @@ export default function ScenePanel() {
   const [customEnvUrl, setCustomEnvUrl] = useState('');
   const [envPreviewUrl, setEnvPreviewUrl] = useState('');
 
-  const defaultEnvValues = DEFAULT_ENVIRONMENTS.map((e) => e.value);
+  const defaultEnvValues = ENVIRONMENT_PRESETS.map((p) => p.env);
   const isCustomEnv = state.environmentImage && !defaultEnvValues.includes(state.environmentImage);
 
   const handleEnvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,67 +120,64 @@ export default function ScenePanel() {
     setCustomEnvUrl('');
   };
 
-  // Quick seasonal presets
-  const setSummerMode = () => {
-    dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: SUMMER_ENV_URL });
-    dispatch({ type: 'SET_BACKGROUND_COLOR', payload: '#ffffff' });
-    dispatch({ type: 'SET_EXPOSURE', payload: 1 });
-  };
-  const setRainMode = () => {
-    dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: RAIN_ENV_URL });
-    dispatch({ type: 'SET_BACKGROUND_COLOR', payload: '#949ba3' });
-    dispatch({ type: 'SET_EXPOSURE', payload: 0.9 });
-  };
-  const setWinterMode = () => {
-    dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: WINTER_ENV_URL });
-    dispatch({ type: 'SET_BACKGROUND_COLOR', payload: '#e8edf2' });
-    dispatch({ type: 'SET_EXPOSURE', payload: 1.1 });
+  const applyPreset = (preset: EnvPreset) => {
+    dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: preset.env });
+    dispatch({ type: 'SET_SKYBOX_IMAGE', payload: preset.sky });
+    dispatch({ type: 'SET_BACKGROUND_COLOR', payload: preset.bg });
+    dispatch({ type: 'SET_EXPOSURE', payload: preset.exposure });
   };
 
-  const isSummerActive = state.environmentImage === SUMMER_ENV_URL;
-  const isRainActive = state.environmentImage === RAIN_ENV_URL;
-  const isWinterActive = state.environmentImage === WINTER_ENV_URL;
+  const activePresetId =
+    state.environmentImage === '' && state.skyboxImage === ''
+      ? 'none'
+      : ENVIRONMENT_PRESETS.find(
+          (p) =>
+            p.env === state.environmentImage && p.sky === state.skyboxImage
+        )?.id ?? null;
+
+  const skyboxFileRef = useRef<HTMLInputElement>(null);
+  const [customSkyboxUrl, setCustomSkyboxUrl] = useState('');
+
+  const handleSkyboxFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validExts = ['.png', '.jpg', '.jpeg', '.webp', '.hdr', '.exr'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!validExts.includes(ext)) {
+      alert('Please select an equirectangular panorama image (PNG, JPG, HDR, EXR).');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    dispatch({ type: 'SET_SKYBOX_IMAGE', payload: url });
+  };
+
+  const handleCustomSkyboxUrlSubmit = () => {
+    if (!customSkyboxUrl.trim()) return;
+    dispatch({ type: 'SET_SKYBOX_IMAGE', payload: customSkyboxUrl.trim() });
+    setCustomSkyboxUrl('');
+  };
+
 
   return (
     <div className="p-4 space-y-5">
-      {/* Seasonal quick presets */}
+      {/* Environment & Skybox presets (image-based) */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-800 mb-2">Quick Presets</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <button onClick={setSummerMode} className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-lg border text-xs font-medium transition-colors ${isSummerActive ? 'bg-amber-300/30 border-amber-400/50 text-amber-700 backdrop-blur-sm' : 'bg-white/40 border-white/30 text-gray-600 hover:bg-amber-400/15 hover:border-amber-300/50 hover:text-amber-800 backdrop-blur-sm'}`}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="4.93" y1="4.93" x2="7.76" y2="7.76" /><line x1="16.24" y1="16.24" x2="19.07" y2="19.07" /><line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" /><line x1="4.93" y1="19.07" x2="7.76" y2="16.24" /><line x1="16.24" y1="7.76" x2="19.07" y2="4.93" /></svg>
-            Summer
-          </button>
-          <button onClick={setRainMode} className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-lg border text-xs font-medium transition-colors ${isRainActive ? 'bg-slate-300/30 border-slate-400/50 text-slate-700 backdrop-blur-sm' : 'bg-white/40 border-white/30 text-gray-600 hover:bg-slate-400/15 hover:border-slate-300/50 hover:text-slate-800 backdrop-blur-sm'}`}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="16" y1="13" x2="16" y2="21" /><line x1="8" y1="13" x2="8" y2="21" /><line x1="12" y1="15" x2="12" y2="23" /><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" /></svg>
-            Rain
-          </button>
-          <button onClick={setWinterMode} className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-lg border text-xs font-medium transition-colors ${isWinterActive ? 'bg-sky-300/30 border-sky-400/50 text-sky-700 backdrop-blur-sm' : 'bg-white/40 border-white/30 text-gray-600 hover:bg-sky-400/15 hover:border-sky-300/50 hover:text-sky-800 backdrop-blur-sm'}`}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22" /><line x1="3.34" y1="7" x2="20.66" y2="17" /><line x1="3.34" y1="17" x2="20.66" y2="7" /><line x1="12" y1="2" x2="9" y2="5" /><line x1="12" y1="2" x2="15" y2="5" /><line x1="12" y1="22" x2="9" y2="19" /><line x1="12" y1="22" x2="15" y2="19" /></svg>
-            Winter
-          </button>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">One-click seasonal lighting.</p>
-      </div>
-
-      {/* Environment Lighting as landscape cards */}
-      <div className="border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-2">Environment Lighting (IBL)</h3>
-        <p className="text-xs text-gray-500 mb-2">Landscape lighting. Click a card to apply.</p>
+        <h3 className="text-sm font-semibold text-gray-800 mb-2">Environment & Skybox</h3>
+        <p className="text-xs text-gray-500 mb-2">Realistic lighting and panoramic background. Click a preset to apply.</p>
 
         <div className="grid grid-cols-2 gap-2">
-          {DEFAULT_ENVIRONMENTS.map((env) => {
-            const active = state.environmentImage === env.value;
+          {ENVIRONMENT_PRESETS.map((preset) => {
+            const active = activePresetId === preset.id;
             return (
               <button
-                key={env.value}
-                onClick={() => dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: env.value })}
+                key={preset.id}
+                onClick={() => applyPreset(preset)}
                 className={`relative rounded-lg border text-left overflow-hidden transition-all backdrop-blur-sm ${active ? 'border-blue-400/60 ring-2 ring-blue-300/50 shadow-sm bg-white/50' : 'border-white/30 bg-white/30 hover:border-white/50 hover:bg-white/50 hover:shadow-sm'}`}
               >
-                <EnvCardPreview kind={env.landscape} />
+                <EnvCardPreview preset={preset} />
                 <div className="px-2 py-1.5">
-                  <div className="text-xs font-semibold text-gray-800 leading-tight">{env.name}</div>
-                  {env.subtitle && <div className="text-[10px] text-gray-400 leading-tight">{env.subtitle}</div>}
+                  <div className="text-xs font-semibold text-gray-800 leading-tight">{preset.name}</div>
+                  <div className="text-[10px] text-gray-400 leading-tight">{preset.subtitle}</div>
                 </div>
               </button>
             );
@@ -172,7 +192,7 @@ export default function ScenePanel() {
 
         <div className="flex gap-2 mt-3">
           <button onClick={() => envFileRef.current?.click()} className="flex-1 px-2 py-1.5 text-xs bg-white/40 hover:bg-white/60 text-gray-700 rounded-lg border border-white/30 backdrop-blur-sm">
-            Upload HDR/EXR
+            Upload HDR / Panorama
           </button>
           <input ref={envFileRef} type="file" accept=".hdr,.exr,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleEnvFileUpload} />
         </div>
@@ -182,49 +202,67 @@ export default function ScenePanel() {
           <button onClick={handleCustomEnvUrlSubmit} disabled={!customEnvUrl.trim()} className="px-2 py-1.5 text-xs bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 disabled:opacity-50">Apply</button>
         </div>
         {envPreviewUrl && (
-          <button onClick={() => { setEnvPreviewUrl(''); dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: '' }); }} className="text-xs text-red-500 hover:text-red-700 mt-1">Clear custom</button>
+          <button onClick={() => { setEnvPreviewUrl(''); dispatch({ type: 'SET_ENVIRONMENT_IMAGE', payload: '' }); dispatch({ type: 'SET_SKYBOX_IMAGE', payload: '' }); }} className="text-xs text-red-500 hover:text-red-700 mt-1">Clear custom</button>
         )}
       </div>
 
-      {/* Skybox — static background behind the model */}
+      {/* Custom Skybox Panorama */}
       <div className="border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-2">Skybox</h3>
-        <p className="text-xs text-gray-500 mb-2">Static background behind the model.</p>
+        <h3 className="text-sm font-semibold text-gray-800 mb-2">Custom Skybox</h3>
+        <p className="text-xs text-gray-500 mb-2">Upload or paste a 360×180 equirectangular panorama for the background.</p>
 
-        <div className="grid grid-cols-2 gap-2">
-          {([
-            { type: 'none' as const, label: 'None', preview: 'bg-gray-100' },
-            { type: 'day' as const, label: 'Day', preview: '' },
-            { type: 'night' as const, label: 'Night', preview: '' },
-            { type: 'sunset' as const, label: 'Sunset', preview: '' },
-          ]).map((s) => {
-            const active = state.skyboxType === s.type;
-            return (
+        <div className="flex gap-2">
+          <button
+            onClick={() => skyboxFileRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs bg-white/40 hover:bg-white/60 text-gray-700 rounded-lg border border-white/30 backdrop-blur-sm transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Upload Panorama
+          </button>
+          <input
+            ref={skyboxFileRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,.webp,.hdr,.exr"
+            className="hidden"
+            onChange={handleSkyboxFileUpload}
+          />
+        </div>
+
+        {state.skyboxImage && (
+          <div className="mt-2 p-2 bg-blue-50/60 rounded-lg border border-blue-200/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-blue-700 truncate font-mono max-w-[180px]">
+                Custom panorama active
+              </span>
               <button
-                key={s.type}
-                onClick={() => dispatch({ type: 'SET_SKYBOX_TYPE', payload: s.type })}
-                className={`relative rounded-lg border text-left overflow-hidden transition-all backdrop-blur-sm ${active ? 'border-blue-400/60 ring-2 ring-blue-300/50 shadow-sm' : 'border-white/30 hover:border-white/50'}`}
+                onClick={() => dispatch({ type: 'SET_SKYBOX_IMAGE', payload: '' })}
+                className="text-xs text-red-500 hover:text-red-700 font-medium"
               >
-                <div className="h-12 rounded-t overflow-hidden">
-                  {s.type === 'none' && (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                      <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300" />
-                    </div>
-                  )}
-                  {s.type === 'day' && (
-                    <div className="w-full h-full" style={{ background: 'linear-gradient(180deg, #2563eb 0%, #60a5fa 30%, #93c5fd 50%, #bfdbfe 65%, #e0f2fe 80%, #f0f9ff 100%)' }} />
-                  )}
-                  {s.type === 'night' && (
-                    <div className="w-full h-full" style={{ background: 'linear-gradient(180deg, #020617 0%, #0f172a 25%, #1e293b 50%, #1a1f3a 70%, #0f1322 100%)' }} />
-                  )}
-                  {s.type === 'sunset' && (
-                    <div className="w-full h-full" style={{ background: 'linear-gradient(180deg, #1e1b4b 0%, #4c1d95 15%, #9333ea 28%, #e879f9 38%, #fb923c 50%, #fbbf24 60%, #fde68a 72%, #fef3c7 100%)' }} />
-                  )}
-                </div>
-                <div className="px-2 py-1.5 text-xs font-semibold text-gray-700">{s.label}</div>
+                Remove
               </button>
-            );
-          })}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2 flex gap-1">
+          <input
+            type="text"
+            value={customSkyboxUrl}
+            onChange={(e) => setCustomSkyboxUrl(e.target.value)}
+            placeholder="Panorama URL"
+            className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+          <button
+            onClick={handleCustomSkyboxUrlSubmit}
+            disabled={!customSkyboxUrl.trim()}
+            className="px-2 py-1.5 text-xs bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            Apply
+          </button>
         </div>
       </div>
 

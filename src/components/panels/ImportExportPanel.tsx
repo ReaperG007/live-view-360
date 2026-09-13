@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useEditor } from '../../store/editor-store';
-import { isGeneratedSkyboxToken } from '../../utils/skybox';
+import { buildStandaloneZip } from '../../utils/export-zip';
 
 export default function ImportExportPanel() {
   const { state, dispatch } = useEditor();
@@ -55,9 +55,7 @@ export default function ImportExportPanel() {
     if (state.autoRotateDelay > 0) attrs.push(`auto-rotate-delay="${state.autoRotateDelay}"`);
     if (state.disableZoom) attrs.push('disable-zoom');
     if (state.environmentImage) attrs.push(`environment-image="${state.environmentImage}"`);
-    // Generated skyboxes are canvas-rendered at runtime; substitute a hosted
-    // equirect image in the snippet (or comment) since data URLs aren't portable.
-    if (state.skyboxImage && !isGeneratedSkyboxToken(state.skyboxImage)) {
+    if (state.skyboxImage) {
       attrs.push(`skybox-image="${state.skyboxImage}"`);
     }
     attrs.push(`exposure="${state.exposure}"`);
@@ -285,6 +283,30 @@ export default function ImportExportPanel() {
           >
             Export Scene (GLB)
           </button>
+          <button
+            onClick={async () => {
+              try {
+                setExportStatus('Building 3D web ZIP…');
+                const blob = await buildStandaloneZip(state);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '3d-web-viewer.zip';
+                a.click();
+                URL.revokeObjectURL(url);
+                setExportStatus('3D web ZIP downloaded — open index.html');
+                setTimeout(() => setExportStatus(''), 4000);
+              } catch (e) {
+                setExportStatus('ZIP export failed: ' + (e as Error).message);
+              }
+            }}
+            disabled={!state.modelSrc}
+            className="w-full px-3 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            Export 3D Web ZIP
+          </button>
+          <p className="text-[11px] text-gray-500 leading-snug">Single download: <strong>index.html</strong> with hotspot + FPV + walkthrough, plus the model. Works offline by just opening index.html. Camera never crosses rigid parts.</p>
           {exportStatus && (
             <p className="text-xs text-green-600 text-center">{exportStatus}</p>
           )}

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useEditor } from '../store/editor-store';
 import ModelViewerElement from './ModelViewerElement';
 import SceneGround from './SceneGround';
+import FpvController from './FpvController';
+import WalkthroughPlayer from './WalkthroughPlayer';
+import WalkScrubController from './WalkScrubController';
 import { focusCameraOnHotspot } from './panels/HotspotPanel';
 import type { ModelViewerInstance } from '../model-viewer';
 
@@ -89,21 +92,77 @@ export default function ModelViewer() {
     }
   }, [dispatch]);
 
-  // Re-frame the camera whenever the model scale changes so the model
-  // always fits the viewport after growing/shrinking.
-  const previousScaleRef = useRef(state.modelScale);
+  // Apply scale imperatively on the model-viewer element and re-frame
+  // the camera after the render catches up.
   useEffect(() => {
-    if (previousScaleRef.current === state.modelScale) return;
-    previousScaleRef.current = state.modelScale;
     const viewer = viewerRef.current as ModelViewerInstance | null;
-    if (!viewer || !state.modelLoaded) return;
+    if (!viewer) return;
+    const s = `${state.modelScale} ${state.modelScale} ${state.modelScale}`;
     try {
-      viewer.scale = `${state.modelScale} ${state.modelScale} ${state.modelScale}`;
-      viewer.updateFraming();
+      // Set the property directly so model-viewer picks it up immediately
+      (viewer as any).scale = s;
+      // Also set the attribute for React reconciliation
+      viewer.setAttribute('scale', s);
+      // Defer updateFraming so the renderer has time to apply the new scale
+      requestAnimationFrame(() => {
+        try {
+          viewer.updateFraming();
+        } catch {
+          // not ready
+        }
+      });
     } catch {
       // viewer not ready
     }
-  }, [state.modelScale, state.modelLoaded]);
+  }, [state.modelScale]);
+
+  // ── FPV camera mode ──────────────────────────────────────────
+  // When FPV mode is active, lock the camera at human eye level
+  // (~1.7 m) and restrict orbit to horizontal rotation + look-up/down.
+  const fpvOrbitRef = useRef(state.cameraOrbit);
+  const fpvTargetRef = useRef(state.cameraTarget);
+  const fpvFovRef = useRef(state.fieldOfView);
+
+  useEffect(() => {
+    const viewer = viewerRef.current as ModelViewerInstance | null;
+    if (!viewer || !state.modelLoaded) return;
+
+    if (state.cameraMode === 'fpv') {
+      // Save current orbit settings so we can restore them
+      try {
+        fpvOrbitRef.current = viewer.getCameraOrbit().toString();
+        fpvTargetRef.current = viewer.getCameraTarget().toString();
+        fpvFovRef.current = `${viewer.getFieldOfView().toFixed(1)}deg`;
+      } catch {
+        // ignore
+      }
+
+      // Lock to eye-level orbit: phi=85deg (5 deg above horizontal),
+      // keep the current radius so the user stays at the same distance.
+      const v = viewer as any;
+      try {
+        const cur = viewer.getCameraOrbit();
+        v.cameraOrbit = `0deg 85deg ${cur.radius}`;
+      } catch {
+        v.cameraOrbit = '0deg 85deg auto';
+      }
+      v.cameraTarget = '0 1 0';
+      v.fieldOfView = '90deg';
+
+      // Disable pan and zoom in FPV — only rotation allowed
+      viewer.setAttribute('disable-pan', '');
+      viewer.setAttribute('disable-zoom', '');
+    } else {
+      // Restore orbit mode settings
+      const v = viewer as any;
+      v.cameraOrbit = fpvOrbitRef.current || state.cameraOrbit;
+      v.cameraTarget = fpvTargetRef.current || state.cameraTarget;
+      v.fieldOfView = fpvFovRef.current || state.fieldOfView;
+      viewer.removeAttribute('disable-pan');
+      // Respect the user's zoom preference
+      if (!state.disableZoom) viewer.removeAttribute('disable-zoom');
+    }
+  }, [state.cameraMode, state.modelLoaded]);
 
   // Set up the ref callback and event listeners
   const setViewerRef = useCallback(
@@ -146,6 +205,9 @@ export default function ModelViewer() {
               focusOrbit: '',
               focusTarget: '',
               focusFov: '',
+              icon: 'pin',
+              color: '#3b82f6',
+              pulse: true,
             },
           });
           dispatch({ type: 'SET_ACTIVE_HOTSPOT', payload: id });
@@ -188,8 +250,8 @@ export default function ModelViewer() {
 
       {state.modelSrc && (
         <div className="relative w-full h-full">
-          {/* Static skybox background */}
-          <SceneGround type={state.skyboxType} />
+          {/* Background color (skybox panorama is handled by model-viewer) */}
+          <SceneGround backgroundColor={state.backgroundColor} />
 
           <ModelViewerElement
             ref={setViewerRef}
@@ -200,6 +262,7 @@ export default function ModelViewer() {
             auto-rotate-delay={state.autoRotateDelay}
             disable-zoom={state.disableZoom || undefined}
             environment-image={state.environmentImage || undefined}
+            skybox-image={state.skyboxImage || undefined}
             exposure={state.exposure}
             shadow-intensity={state.shadowIntensity}
             shadow-softness={state.shadowSoftness}
@@ -224,23 +287,58 @@ export default function ModelViewer() {
           }}
           onCameraChange={handleCameraChange}
         >
-            {state.hotspots.map((hotspot, i) => (
-              <button
-                key={hotspot.id}
-                slot={`hotspot-${hotspot.id}-${i}`}
-                data-position={hotspot.position}
-                data-normal={hotspot.normal}
-                className={`hotspot-btn ${state.activeHotspotId === hotspot.id ? 'active' : ''}`}
-                onClick={() => handleHotspotClick(hotspot.id)}
-              >
-                <div className="hotspot-label">
-                  <strong>{hotspot.title}</strong>
-                  {hotspot.description && <p>{hotspot.description}</p>}
-                </div>
-              </button>
-            ))}
+            {state.hotspots.map((hotspot, i) => {
+              const col = hotspot.color || '#3b82f6';
+              const pul = hotspot.pulse ?? true;
+              return (
+                <button
+                  key={hotspot.id}
+                  slot={`hotspot-${hotspot.id}-${i}`}
+                  data-position={hotspot.position}
+                  data-normal={hotspot.normal}
+                  className={`hotspot-btn ${state.activeHotspotId === hotspot.id ? 'active' : ''}`}
+                  onClick={() => handleHotspotClick(hotspot.id)}
+                  style={{ ['--hs-color' as string]: col } as React.CSSProperties}
+                  data-hotspot-color={col}
+                  data-hotspot-icon={hotspot.icon || 'pin'}
+                  data-hotspot-pulse={pul ? '1' : '0'}
+                >
+                  <span
+                    className="hotspot-dot"
+                    style={{
+                      background: col,
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid white',
+                      boxShadow: pul ? `0 0 0 6px ${col}33` : '0 2px 8px rgba(0,0,0,.25)',
+                      color: 'white',
+                    }}
+                  >
+                    •
+                  </span>
+                  <div className="hotspot-label">
+                    <strong>{hotspot.title}</strong>
+                    {hotspot.description && <p>{hotspot.description}</p>}
+                  </div>
+                </button>
+              );
+            })}
           </ModelViewerElement>
         </div>
+      )}
+
+      {/* FPV virtual joystick overlay */}
+      {state.modelSrc && state.cameraMode === 'fpv' && <FpvController />}
+      {/* Walkthrough playback */}
+      <WalkthroughPlayer />
+
+      {/* Walk scrub joystick overlay — shown when camera path exists */}
+      {state.modelSrc && state.cameraPath.length >= 2 && !state.walkthroughPlaying && (
+        <WalkScrubController />
       )}
 
       {/* Reset View floating button — appears when a model is active */}

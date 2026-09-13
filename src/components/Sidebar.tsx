@@ -6,6 +6,7 @@ import CameraPanel from './panels/CameraPanel';
 import AnimationPanel from './panels/AnimationPanel';
 import MaterialsPanel from './panels/MaterialsPanel';
 import HotspotPanel from './panels/HotspotPanel';
+import WalkthroughPanel from './panels/WalkthroughPanel';
 import InspectorPanel from './panels/InspectorPanel';
 
 interface TabConfig {
@@ -73,6 +74,16 @@ const tabs: TabConfig[] = [
       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
         <circle cx="12" cy="10" r="3" />
+      </svg>
+    ),
+  },
+  {
+    id: 'walkthrough',
+    label: 'Walkthrough',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 009 15a1.65 1.65 0 00-1-1.51A1.65 1.65 0 006.18 13l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 0010.82 10a1.65 1.65 0 001-1.51V8a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0015 12a1.65 1.65 0 001 1.51z" />
       </svg>
     ),
   },
@@ -150,6 +161,7 @@ export default function Sidebar() {
           {state.activeTab === 'animation' && <AnimationPanel />}
           {state.activeTab === 'materials' && <MaterialsPanel />}
           {state.activeTab === 'hotspots' && <HotspotPanel />}
+          {state.activeTab === 'walkthrough' && <WalkthroughPanel />}
           {state.activeTab === 'inspector' && <InspectorPanel />}
         </div>
 
